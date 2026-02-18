@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokedex</title>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  background: #f25c5c;
+}
+
+header {
+  background: #fff;
+  padding: 15px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.search-box {
+  display: flex;
+  gap: 5px;
+}
+
+.search-box input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.search-box button {
+  padding: 8px 12px;
+  border: none;
+  background: #f25c5c;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+main {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+}
+
+.pokemon-grid {
+  flex: 2;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: #fff;
+  padding: 15px;
+  border-radius: 15px;
+  text-align: center;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.card:hover {
+  transform: scale(1.05);
+}
+
+.card img {
+  width: 100px;
+}
+
+.details {
+  flex: 1;
+  background: #fff;
+  border-radius: 15px;
+  padding: 20px;
+  min-height: 500px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.details img {
+  width: 150px;
+}
+
+.type {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  color: white;
+  font-size: 12px;
+  margin: 5px 3px;
+}
+
+/* Type Colors */
+.grass { background: #78C850; }
+.fire { background: #F08030; }
+.water { background: #6890F0; }
+.bug { background: #A8B820; }
+.poison { background: #A040A0; }
+.flying { background: #A890F0; }
+.normal { background: #A8A878; }
+.electric { background: #F8D030; }
+.ground { background: #E0C068; }
+.psychic { background: #F85888; }
+.ice { background: #98D8D8; }
+.fighting { background: #C03028; }
+.rock { background: #B8A038; }
+.ghost { background: #705898; }
+
+.evolution {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.evolution img {
+  width: 60px;
+}
+
+.nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 15px;
+}
+
+.nav-buttons button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #ddd;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.nav-buttons button:hover {
+  background: #ccc;
+}
+
+hr {
+  width: 100%;
+  margin: 15px 0;
+}
+
+@media(max-width: 900px) {
+  main {
+    flex-direction: column;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>☰ Pokedex</h1>
+  <div class="search-box">
+    <input type="text" id="search" placeholder="Name or number">
+    <button id="searchBtn">🔍</button>
+  </div>
+</header>
+
+<main>
+  <section class="pokemon-grid" id="pokemonGrid"></section>
+  <aside class="details" id="details">
+    <p>Select a Pokémon</p>
+  </aside>
+</main>
+
+<script>
+const grid = document.getElementById("pokemonGrid");
+const details = document.getElementById("details");
+const searchInput = document.getElementById("search");
+const searchBtn = document.getElementById("searchBtn");
+
+let pokemonList = [];
+
+/* PRELOAD FIRST 16 */
+async function preloadPokemon() {
+  const promises = [];
+  for (let i = 1; i <= 16; i++) {
+    promises.push(fetch(`https://pokeapi.co/api/v2/pokemon/${i}`).then(r => r.json()));
+  }
+  pokemonList = await Promise.all(promises);
+  pokemonList.forEach(createCard);
+}
+
+/* CREATE CARD */
+function createCard(pokemon) {
+  const card = document.createElement("div");
+  card.classList.add("card");
+
+  card.innerHTML = `
+    <small>#${pokemon.id.toString().padStart(3, "0")}</small>
+    <img src="${pokemon.sprites.other['official-artwork'].front_default}">
+    <h3>${capitalize(pokemon.name)}</h3>
+    ${pokemon.types.map(t => 
+      `<span class="type ${t.type.name}">${t.type.name}</span>`
+    ).join("")}
+  `;
+
+  card.addEventListener("click", () => showDetails(pokemon));
+  grid.appendChild(card);
+}
+
+/* SHOW DETAILS */
+async function showDetails(pokemon) {
+
+  details.innerHTML = "Loading...";
+
+  const evolutionHTML = await getEvolutionChain(pokemon);
+  const weaknessHTML = await getWeaknesses(pokemon);
+
+  details.innerHTML = `
+    <h2>#${pokemon.id.toString().padStart(3,"0")} ${capitalize(pokemon.name)}</h2>
+    <img src="${pokemon.sprites.other['official-artwork'].front_default}">
+    
+    <div>
+      ${pokemon.types.map(t => 
+        `<span class="type ${t.type.name}">${t.type.name}</span>`
+      ).join("")}
+    </div>
+
+    <p><strong>Height:</strong> ${pokemon.height/10} m</p>
+    <p><strong>Weight:</strong> ${pokemon.weight/10} kg</p>
+    <p><strong>Abilities:</strong> ${pokemon.abilities.map(a => capitalize(a.ability.name)).join(", ")}</p>
+
+    <hr>
+    <h3>Weakness</h3>
+    <div>${weaknessHTML}</div>
+
+    <hr>
+    <h3>Evolution</h3>
+    <div class="evolution">${evolutionHTML}</div>
+
+    <hr>
+    <div class="nav-buttons">
+      <button id="prevBtn">⬅ ${pokemon.id - 1}</button>
+      <button id="nextBtn">${pokemon.id + 1} ➡</button>
+    </div>
+  `;
+
+  /* NAVIGATION EVENTS */
+  document.getElementById("prevBtn").addEventListener("click", () => {
+    if (pokemon.id > 1) fetchAndShow(pokemon.id - 1);
+  });
+
+  document.getElementById("nextBtn").addEventListener("click", () => {
+    fetchAndShow(pokemon.id + 1);
+  });
+}
+
+/* FETCH AND SHOW */
+async function fetchAndShow(id) {
+  const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
+  if (!res.ok) return;
+  const data = await res.json();
+  showDetails(data);
+}
+
+/* WEAKNESS */
+async function getWeaknesses(pokemon) {
+  let weaknesses = new Set();
+
+  for (let t of pokemon.types) {
+    const res = await fetch(t.type.url);
+    const data = await res.json();
+    data.damage_relations.double_damage_from.forEach(w => 
+      weaknesses.add(w.name)
+    );
+  }
+
+  return [...weaknesses]
+    .map(w => `<span class="type ${w}">${w}</span>`)
+    .join("");
+}
+
+/* EVOLUTION */
+async function getEvolutionChain(pokemon) {
+  const species = await fetch(pokemon.species.url).then(r => r.json());
+  const evoData = await fetch(species.evolution_chain.url).then(r => r.json());
+
+  let chain = evoData.chain;
+  let html = "";
+
+  while (chain) {
+    const name = chain.species.name;
+    const data = await fetch(`https://pokeapi.co/api/v2/pokemon/${name}`).then(r => r.json());
+
+    html += `<img src="${data.sprites.other['official-artwork'].front_default}" title="${name}">`;
+
+    chain = chain.evolves_to[0];
+    if (chain) html += " ➝ ";
+  }
+
+  return html;
+}
+
+/* SEARCH */
+async function handleSearch() {
+  const value = searchInput.value.toLowerCase().trim();
+
+  if (!value) {
+    grid.innerHTML = "";
+    pokemonList.forEach(createCard);
+    return;
+  }
+
+  const found = pokemonList.find(p => 
+    p.name === value || p.id.toString() === value
+  );
+
+  grid.innerHTML = "";
+
+  if (found) {
+    createCard(found);
+    showDetails(found);
+  } else {
+    try {
+      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${value}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      createCard(data);
+      showDetails(data);
+    } catch {
+      grid.innerHTML = "<p>No Pokémon found</p>";
+    }
+  }
+}
+
+searchBtn.addEventListener("click", handleSearch);
+searchInput.addEventListener("keypress", e => {
+  if (e.key === "Enter") handleSearch();
+});
+
+function capitalize(word) {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+preloadPokemon();
+</script>
+
+</body>
+</html>
